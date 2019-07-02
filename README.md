@@ -5,12 +5,12 @@ Collector Agent
 
 There are two nodes:
 
-* *trader_node* - to work on offchain negotiations process
-* *worker_node* - trivial liability process executor
+* *applicant* - sends a request to issue new certificates based on the log in the objective field
+* *collector* - continuously collect the data from the solar panel
 
-## Parameters
+## Service
 
-Objective `QmVAFgUxBitKqtV2sjaYcHkKfcAPVy3GswhaE5n5bcgLkf`
+*make_demand* - call to create a demand message
 
 ## Build
 
@@ -20,12 +20,20 @@ nix build -f release.nix
 
 ## Run
 
-It's important to specify the `keyfile` file with a private key
-
 ```
 source result/setup.zsh
-roslaunch collector-agent worker.launch keyfile:=/root/collector-agent/keyfile
-
-roslaunch collector-agent trader.launch
+roslaunch collector-agent applicant.launch \
+    user:=<postgres_user_name> \
+    password_file:=<path_to_password_file> \
+    rest_api_keys_file:=<path_to_rest_api_user_and_password_file>
 ```
+
+```
+roslaunch collector-agent collector.launch \
+    user:=<postgres_user_name> \
+    password_file:=<path_to_password_file> \
+    rest_api_keys_file:=<path_to_rest_api_user_and_password_file>
+```
+
+By default, `host = 127.0.0.1`, `database = skolkovo` and `port = 5432`
 

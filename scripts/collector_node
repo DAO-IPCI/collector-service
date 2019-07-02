@@ -55,28 +55,23 @@ class CollectorNode:
                 c.request('GET', '/api/v1/object/', headers=headers)
                 # get the response back
                 res = c.getresponse()
+
+                if res.status == 200:
+                    # at this point you could check the status etc
+                    # this gets the page text
+                    data = res.read().decode("utf-8")
+
+                    print("Got it! {}...".format(data[:20]))
+
+                    cursor = self.connection.cursor()
+                    cursor.execute(
+                        "INSERT INTO solar (measure) VALUES ('{}');".format(data))
+                    self.connection.commit()
             except:
                 print("Got an error. Retrying...")
-                sleep(10)
-                continue
-
-            if res.status != 200:
-                sleep(10)
-                continue
-
-            # at this point you could check the status etc
-            # this gets the page text
-            data = res.read().decode("utf-8")
-
-            print("Got it! {}...".format(data[:20]))
-
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "INSERT INTO solar (measure) VALUES ('{}');".format(data))
-            self.connection.commit()
-
-            print("Waiting 60 sec")
-            Timer(60, collect_data).start()
+            finally:
+                print("Waiting 60 sec")
+                Timer(60, collect_data).start()
 
         collect_data()
         rospy.spin()

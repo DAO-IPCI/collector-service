@@ -41,7 +41,11 @@ class ApplicantNode:
         try:
             # Put user name, password etc
             self.connection = psycopg2.connect(
-                user="", password="", host="", port="", database="")
+                user=rospy.get_param('~user'),
+                password=rospy.get_param('~password'),
+                host=rospy.get_param('~host'),
+                port=rospy.get_param('~port'),
+                database=rospy.get_param('~database'))
             cursor = self.connection.cursor()
             # Print PostgreSQL Connection properties
             print(self.connection.get_dsn_parameters(), "\n")
