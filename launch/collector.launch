@@ -1,0 +1,18 @@
+<launch>
+  <!-- Sidechain -->
+  <arg name="user" default="" />
+  <arg name="password_file" default="" />
+  <arg name="host" default="127.0.0.1" />
+  <arg name="port" default="5432" />
+  <arg name="database" default="skolkovo" />
+  <arg name="rest_api_keys_file" default="" />
+
+  <node name="collector" pkg="collector-agent" type="collector_node" output="screen">
+    <param name="user" value="$(arg user)" />
+    <param name="password" textfile="$(arg password_file)" />
+    <param name="host" value="$(arg host)" />
+    <param name="port" value="$(arg port)" />
+    <param name="database" value="$(arg database)" />
+    <param name="rest_api_keys" textfile="$(arg rest_api_keys_file)" />
+  </node>
+</launch>

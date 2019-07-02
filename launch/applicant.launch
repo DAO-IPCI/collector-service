@@ -1,0 +1,10 @@
+<launch>
+  <node name="applicant" pkg="collector-agent" type="applicant_node" output="screen">
+    <param name="lighthouse" value="0x202a09A451DE674d2d65Bf1C90968a8d8F72cf7b" />
+    <param name="model" value="QmUB6ajZTLLMZg7re1v4hw44aoG8HDQDHr9JyujU264Aw2" />
+    <param name="token" value="0x966EbbFD7ECbCF44b1e05341976e0652CFA01360" />
+    <param name="validator" value="0x17B82177D8753bd8090dadA60B953CFaDD9eF492" />
+    <param name="cost" value="0" />
+    <param name="order_lifetime" value="100" />
+  </node>
+</launch>
