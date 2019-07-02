@@ -23,7 +23,7 @@ class CollectorNode:
             # Put user name, password etc
             self.connection = psycopg2.connect(
                 user=rospy.get_param('~user'),
-                password=rospy.get_param('~password'),
+                password=rospy.get_param('~password')[:-1],
                 host=rospy.get_param('~host'),
                 port=rospy.get_param('~port'),
                 database=rospy.get_param('~database'))
@@ -39,7 +39,7 @@ class CollectorNode:
             print("Error while connecting to PostgreSQL", error)
             sys.exit()
 
-        self.rest_api_key = rospy.get_param('~rest_api_key')
+        self.rest_api_key = rospy.get_param('~rest_api_keys')[:-1]
 
         rospy.loginfo('Collector node is ready!')
 
