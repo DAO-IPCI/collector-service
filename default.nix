@@ -8,7 +8,7 @@ with pkgs.python37Packages;
 
 mkRosPackage rec {
   name = "${pname}-${version}";
-  pname = "collector-agent";
+  pname = "collector_agent";
   version = "master";
 
   src = ./.;

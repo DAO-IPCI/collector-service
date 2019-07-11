@@ -1,12 +1,13 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>collector-agent</name>
+  <name>collector_agent</name>
   <version>0.2.0</version>
   <description>The second part of renewable energy agent</description>
   <author email="vadim.razorq@gmail.com">Vadim Manaenko</author>
   <maintainer email="akru@aira.life">Alexander Krupenkin</maintainer>
   <license>BSD3</license>
   <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
   <build_depend>robonomics_msgs</build_depend>
   <build_depend>robonomics_liability</build_depend>
   <build_depend>rospy</build_depend>

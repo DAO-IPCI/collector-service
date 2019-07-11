@@ -19,6 +19,8 @@ from ethereum_common.msg import Address, UInt256
 from ethereum_common.srv import Accounts, BlockNumber
 from ipfs_common.msg import Multihash
 
+from collector_agent.srv import GetObjective, GetObjectiveResponse
+
 
 class ApplicantNode:
 
@@ -36,13 +38,17 @@ class ApplicantNode:
 
         self.ipfs = connect('https://ipfs.infura.io', 5001)
 
-        rospy.Service('make_demand', Empty, self.act)
+        rospy.Service('publish_demand', Empty, self.act)
+        rospy.Service('get_objective', GetObjective, self.get_objective)
+
+        rospy.loginfo("Password postgres '{}'".format(rospy.get_param('~password')))
+        rospy.loginfo("Password rest '{}'".format(rospy.get_param('~rest_api_keys')))
 
         try:
             # Put user name, password etc
             self.connection = psycopg2.connect(
                 user=rospy.get_param('~user'),
-                password=rospy.get_param('~password'),
+                password=rospy.get_param('~password')[:-1],
                 host=rospy.get_param('~host'),
                 port=rospy.get_param('~port'),
                 database=rospy.get_param('~database'))
@@ -63,6 +69,10 @@ class ApplicantNode:
     def act(self, data):
         self.make_demand()
         return EmptyResponse()
+
+    def get_objective(self, data):
+        obj = self.make_objective()
+        return GetObjectiveResponse(objective=obj)
 
     def make_deadline(self):
         lifetime = int(rospy.get_param('~order_lifetime'))
@@ -98,7 +108,7 @@ class ApplicantNode:
                               ipfs_response[1]['Message'])
                 msg = ipfs_response[0]['Hash']
 
-            rospy.loginfo('Objective hash: {}'.format(msg.result.multihash))
+            rospy.loginfo('Objective hash: {}'.format(msg))
             return msg
 
     def make_demand(self):
