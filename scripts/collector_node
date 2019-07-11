@@ -6,7 +6,6 @@ import psycopg2
 import sys
 from http.client import HTTPSConnection
 from base64 import b64encode
-from time import sleep
 from threading import Timer
 
 # ROS
