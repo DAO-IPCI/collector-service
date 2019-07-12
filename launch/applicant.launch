@@ -4,19 +4,33 @@
     <arg name="host" default="127.0.0.1" />
     <arg name="port" default="5432" />
     <arg name="database" default="skolkovo" />
+    <arg name="rest_api_keys_file" default="" />
 
-    <node name="applicant" pkg="collector_agent" type="applicant_node" output="screen">
-        <param name="lighthouse" value="0x202a09A451DE674d2d65Bf1C90968a8d8F72cf7b" />
-        <param name="model" value="QmUB6ajZTLLMZg7re1v4hw44aoG8HDQDHr9JyujU264Aw2" />
-        <param name="token" value="0x966EbbFD7ECbCF44b1e05341976e0652CFA01360" />
-        <param name="validator" value="0x17B82177D8753bd8090dadA60B953CFaDD9eF492" />
-        <param name="cost" value="0" />
-        <param name="order_lifetime" value="100" />
+    <group ns="applicant">
+        <node name="applicant" pkg="collector_agent" type="applicant_node" output="screen">
+            <param name="lighthouse" value="0x202a09A451DE674d2d65Bf1C90968a8d8F72cf7b" />
+            <param name="model" value="QmUB6ajZTLLMZg7re1v4hw44aoG8HDQDHr9JyujU264Aw2" />
+            <param name="token" value="0x966EbbFD7ECbCF44b1e05341976e0652CFA01360" />
+            <param name="validator" value="0x17B82177D8753bd8090dadA60B953CFaDD9eF492" />
+            <param name="cost" value="0" />
+            <param name="order_lifetime" value="100" />
 
-        <param name="user" value="$(arg user)" />
-        <param name="password" textfile="$(arg password_file)" />
-        <param name="host" value="$(arg host)" />
-        <param name="port" value="$(arg port)" />
-        <param name="database" value="$(arg database)" />
-    </node>
+            <param name="user" value="$(arg user)" />
+            <param name="password" textfile="$(arg password_file)" />
+            <param name="host" value="$(arg host)" />
+            <param name="port" value="$(arg port)" />
+            <param name="database" value="$(arg database)" />
+        </node>
+    </group>
+
+    <group ns="collector">
+        <node name="collector" pkg="collector_agent" type="collector_node" output="screen">
+            <param name="user" value="$(arg user)" />
+            <param name="password" textfile="$(arg password_file)" />
+            <param name="host" value="$(arg host)" />
+            <param name="port" value="$(arg port)" />
+            <param name="database" value="$(arg database)" />
+            <param name="rest_api_keys" textfile="$(arg rest_api_keys_file)" />
+        </node>
+    </group>
 </launch>

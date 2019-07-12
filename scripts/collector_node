@@ -72,6 +72,7 @@ class CollectorNode:
                 print("Waiting 60 sec")
                 Timer(60, collect_data).start()
 
+        # Commented for test purspose
         collect_data()
         rospy.spin()
 

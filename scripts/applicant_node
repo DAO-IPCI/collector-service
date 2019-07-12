@@ -42,7 +42,6 @@ class ApplicantNode:
         rospy.Service('get_objective', GetObjective, self.get_objective)
 
         rospy.loginfo("Password postgres '{}'".format(rospy.get_param('~password')))
-        rospy.loginfo("Password rest '{}'".format(rospy.get_param('~rest_api_keys')))
 
         try:
             # Put user name, password etc
