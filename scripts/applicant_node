@@ -92,10 +92,14 @@ class ApplicantNode:
             r = rospy.Rate(10)  # 10 Hz
             for item in cursor:
                 try:
-                    recorder.write('/data', String(data=item[0]))
+                    recorder.write('/row', String(data=item[0]))
                 except ValueError as e:
                     print("{} {}".format(e, item[0]))
                 r.sleep()
+
+            rospy.sleep(1)
+
+            recorder.write('/finish', String(data='done'))
 
             recorder.close()
 

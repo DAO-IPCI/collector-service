@@ -28,7 +28,6 @@ catkin_install_python(
 install(
     FILES
         launch/applicant.launch
-        launch/collector.launch
     DESTINATION
         ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
