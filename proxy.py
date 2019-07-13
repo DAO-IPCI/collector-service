@@ -25,8 +25,8 @@ def call_demand_service():
 @app.route('/get_objective', methods=['POST'])
 def call_get_objective_service():
     rospy.loginfo('Get objective')
-    rospy.wait_for_service("get_objective")
-    get_objective = rospy.ServiceProxy("get_objective", GetObjective)
+    rospy.wait_for_service("/applicant/get_objective")
+    get_objective = rospy.ServiceProxy("/applicant/get_objective", GetObjective)
     rospy.loginfo("Calling the 'get_objective' service")
     obj = get_objective(GetObjectiveRequest(''))
     return obj.objective

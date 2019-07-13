@@ -17,7 +17,8 @@ from std_msgs.msg import String
 from robonomics_msgs.msg import Demand
 from ethereum_common.msg import Address, UInt256
 from ethereum_common.srv import Accounts, BlockNumber
-from ipfs_common.msg import Multihash
+from ipfs_common.msg import Multihash, Filepath
+from ipfs_common.srv import IpfsUploadFile, IpfsUploadFileRequest, IpfsUploadFileResponse
 
 from collector_agent.srv import GetObjective, GetObjectiveResponse
 
@@ -35,8 +36,6 @@ class ApplicantNode:
 
         self.signing_demand = rospy.Publisher(
             '/liability/infochan/eth/signing/demand', Demand, queue_size=128)
-
-        self.ipfs = connect('https://ipfs.infura.io', 5001)
 
         rospy.Service('publish_demand', Empty, self.act)
         rospy.Service('get_objective', GetObjective, self.get_objective)
@@ -103,16 +102,15 @@ class ApplicantNode:
 
             recorder.close()
 
-            ipfs_response = self.ipfs.add(tmpfile.name)
-            try:
-                msg = ipfs_response['Hash']
-            except TypeError:
-                rospy.logwarn('IPFS add proceeding error: %s',
-                              ipfs_response[1]['Message'])
-                msg = ipfs_response[0]['Hash']
+            rospy.wait_for_service('/ipfs/add_file')
+            add_file = rospy.ServiceProxy('/ipfs/add_file', IpfsUploadFile)
+            response = add_file(IpfsUploadFileRequest(Filepath(tmpfile.name)))
 
-            rospy.loginfo('Objective hash: {}'.format(msg))
-            return msg
+            if response.success:
+                rospy.loginfo('Objective hash: {}'.format(response.ipfs_address.multihash))
+                return response.ipfs_address.multihash
+            else:
+                rospy.logerr("Error while publishing file to IPFS: {}".format(response.error_msg))
 
     def make_demand(self):
         rospy.loginfo('Making demand...')
