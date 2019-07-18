@@ -13,7 +13,7 @@ mkRosPackage rec {
 
   src = ./.;
 
-  propagatedBuildInputs = [ robonomics_comm pkgs.python37Packages.psycopg2 ];
+  propagatedBuildInputs = [ robonomics_comm pkgs.python37Packages.psycopg2 pkgs.python37Packages.sqlalchemy ];
 
   meta = with stdenv.lib; {
     description = "The collector of data from energy source";

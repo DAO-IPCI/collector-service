@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 # Standart, System and Third Party
-import psycopg2
-import sys
+import sqlalchemy as db
 from ipfsapi import connect
 from tempfile import NamedTemporaryFile
+from datetime import datetime as dt
 
 # ROS
 import rospy
@@ -40,27 +40,12 @@ class ApplicantNode:
         rospy.Service('publish_demand', Empty, self.act)
         rospy.Service('get_objective', GetObjective, self.get_objective)
 
-        rospy.loginfo("Password postgres '{}'".format(rospy.get_param('~password')))
-
-        try:
-            # Put user name, password etc
-            self.connection = psycopg2.connect(
-                user=rospy.get_param('~user'),
-                password=rospy.get_param('~password')[:-1],
-                host=rospy.get_param('~host'),
-                port=rospy.get_param('~port'),
-                database=rospy.get_param('~database'))
-            cursor = self.connection.cursor()
-            # Print PostgreSQL Connection properties
-            print(self.connection.get_dsn_parameters(), "\n")
-            # Print PostgreSQL version
-            cursor.execute("SELECT version();")
-            record = cursor.fetchone()
-            print("You are connected to - ", record, "\n")
-
-        except (Exception, psycopg2.Error) as error:
-            print("Error while connecting to PostgreSQL", error)
-            sys.exit()
+        # Init DB
+        engine = db.create_engine(rospy.get_param('~db_url')[:-1])
+        metadata = db.MetaData()
+        self.connection = engine.connect()
+        self.solar = db.Table(rospy.get_param('~table_name'), metadata,
+                              autoload=True, autoload_with=engine)
 
         rospy.loginfo('Applicant node is ready!')
 
@@ -83,23 +68,33 @@ class ApplicantNode:
             recorder = Bag(tmpfile.name, 'w')
             rospy.loginfo("Collecting data...")
 
-            cursor = self.connection.cursor()
-            cursor.execute("SELECT measure FROM solar;")
+            sel = db.select([self.solar])
+            res = self.connection.execute(sel)
 
-            rospy.loginfo("Got {} rows...".format(cursor.rowcount))
+            rospy.loginfo("Got {} rows...".format(res.rowcount))
 
-            r = rospy.Rate(10)  # 10 Hz
-            for item in cursor:
+            r = rospy.Rate(100)  # 100 Hz
+
+            # item[0] - id
+            # item[1] - measure
+            # item[2] - time stamp
+            item = res.fetchone()
+            time_end = item[2]
+            recorder.write('/time_start', String(data=dt.isoformat(item[2])))
+            recorder.write('/row', String(data=item[1]))
+
+            for item in res:
                 try:
-                    recorder.write('/row', String(data=item[0]))
+                    recorder.write('/row', String(data=item[1]))
+                    time_end = item[2]
                 except ValueError as e:
                     print("{} {}".format(e, item[0]))
                 r.sleep()
 
+            recorder.write('/time_end', String(data=isoformat(time_end)))
             rospy.sleep(1)
 
             recorder.write('/finish', String(data='done'))
-
             recorder.close()
 
             rospy.wait_for_service('/ipfs/add_file')
@@ -142,3 +137,4 @@ class ApplicantNode:
 
 if __name__ == '__main__':
     ApplicantNode().spin()
+

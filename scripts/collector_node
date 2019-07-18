@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 # Standart, System and Third party
-import psycopg2
-import sys
+import sqlalchemy as db
+from sqlalchemy.sql import func
+
 from http.client import HTTPSConnection
 from base64 import b64encode
 from threading import Timer
@@ -18,29 +19,27 @@ class CollectorNode:
         rospy.init_node('collector')
         rospy.loginfo('Launching collector node...')
 
-        try:
-            # Put user name, password etc
-            self.connection = psycopg2.connect(
-                user=rospy.get_param('~user'),
-                password=rospy.get_param('~password')[:-1],
-                host=rospy.get_param('~host'),
-                port=rospy.get_param('~port'),
-                database=rospy.get_param('~database'))
-            cursor = self.connection.cursor()
-            # Print PostgreSQL Connection properties
-            print(self.connection.get_dsn_parameters(), "\n")
-            # Print PostgreSQL version
-            cursor.execute("SELECT version();")
-            record = cursor.fetchone()
-            print("You are connected to - ", record, "\n")
+        # Init DB
+        engine = db.create_engine(rospy.get_param('~db_url')[:-1])
+        self.connection = engine.connect()
+        self.solar = self.__init_table(engine, rospy.get_param('~table_name'))
 
-        except (Exception, psycopg2.Error) as error:
-            print("Error while connecting to PostgreSQL", error)
-            sys.exit()
-
-        self.rest_api_key = rospy.get_param('~rest_api_keys')[:-1]
+        self.rest_api_key = rospy.get_param('~rest_api_key')[:-1]
 
         rospy.loginfo('Collector node is ready!')
+
+    def __init_table(self, engine, table_name):
+        metadata = db.MetaData()
+        if not engine.dialect.has_table(engine, table_name):
+            rospy.loginfo("Initialazing DB with a table name '{}'".format(table_name))
+
+            solar = db.Table(table_name, metadata,
+                             db.Column('id', db.Integer, primary_key=True),
+                             db.Column('measure', db.TEXT),
+                             db.Column('time_stamp', db.TIMESTAMP(True), server_default=func.now()))
+            metadata.create_all(engine)
+            return solar
+        return db.Table(table_name, metadata, autoload=True, autoload_with=engine)
 
     def spin(self):
         def collect_data():
@@ -62,10 +61,8 @@ class CollectorNode:
 
                     print("Got it! {}...".format(data[:20]))
 
-                    cursor = self.connection.cursor()
-                    cursor.execute(
-                        "INSERT INTO solar (measure) VALUES ('{}');".format(data))
-                    self.connection.commit()
+                    ins = db.insert(self.solar).values(measure=data)
+                    res = self.connection.execute(ins)
             except:
                 print("Got an error. Retrying...")
             finally:
