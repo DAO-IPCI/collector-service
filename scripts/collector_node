@@ -48,7 +48,7 @@ class CollectorNode:
                 bytes(self.rest_api_key, 'utf-8')).decode("ascii")
             headers = {'Authorization': 'Basic %s' % userAndPass}
 
-            print("getting data...")
+            rospy.loginfo("Sending a request...")
             try:
                 c.request('GET', '/api/v1/object/', headers=headers)
                 # get the response back
@@ -59,14 +59,14 @@ class CollectorNode:
                     # this gets the page text
                     data = res.read().decode("utf-8")
 
-                    print("Got it! {}...".format(data[:20]))
+                    rospy.loginfo("Recieved the data: {}...".format(data[:30]))
 
                     ins = db.insert(self.solar).values(measure=data)
                     res = self.connection.execute(ins)
             except:
-                print("Got an error. Retrying...")
+                rospy.logerr("[Collector] Got an error. Retrying...")
             finally:
-                print("Waiting 60 sec")
+                rospy.loginfo("[Collector] Waiting 60 sec")
                 Timer(60, collect_data).start()
 
         # Commented for test purspose
