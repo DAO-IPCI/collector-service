@@ -9,8 +9,13 @@ from http.client import HTTPSConnection
 from base64 import b64encode
 from threading import Timer
 
+from collector_agent import RepeatedTimer
+
+import json
+
 # ROS
 import rospy
+from std_msgs.srv import Empty, EmptyResponse, EmptyRequest
 
 
 class CollectorNode:
@@ -22,55 +27,86 @@ class CollectorNode:
         # Init DB
         engine = db.create_engine(rospy.get_param('~db_url')[:-1])
         self.connection = engine.connect()
-        self.solar = self.__init_table(engine, rospy.get_param('~table_name'))
+        self.solar_table, self.meta_table = self.__init_tables(engine)
 
         self.rest_api_key = rospy.get_param('~rest_api_key')[:-1]
 
+        if rospy.get_param("~run_service") == "true":
+            rospy.Service("/collect_data", Empty, self.collect_data)
+        else:
+            timeout = rospy.get_param("~timeout")
+            rt = RepeatedTimer(timeout, self.collect_data, EmptyRequest())
+
         rospy.loginfo('Collector node is ready!')
 
-    def __init_table(self, engine, table_name):
+    def __init_table(self, engine):
         metadata = db.MetaData()
-        if not engine.dialect.has_table(engine, table_name):
-            rospy.loginfo("Initialazing DB with a table name '{}'".format(table_name))
+        meta_table = "energy_source"
+        solar_table = "measurements"
+        if not engine.dialect.has_table(engine, meta_table) or not engine.dialect.has_table(engine, solar_table):
+            rospy.loginfo("Initalazing DB with tables '{}' and '{}'...".format(meta_table, solar_table))
 
-            solar = db.Table(table_name, metadata,
+            meta = db.Table(meta_table, metadata,
+                            db.Column('field', db.VARCHAR(200)),
+                            db.Column('value', db.VARCHAR(200)))
+
+            solar = db.Table(solar_table, metadata,
                              db.Column('id', db.Integer, primary_key=True),
                              db.Column('measure', db.TEXT),
                              db.Column('time_stamp', db.TIMESTAMP(True), server_default=func.now()))
             metadata.create_all(engine)
-            return solar
-        return db.Table(table_name, metadata, autoload=True, autoload_with=engine)
+
+            dinsert = self.__get_init_values(rospy.get_param('~energy_source_config'))
+            self.connection.execute(meta.insert(), dinsert[0], dinsert[1])
+
+        else:
+            meta = db.Table(meta_table, metadata, autoload=True, autoload_with=engine)
+            solar = db.Table(solar_table, metadata, autoload=True, autoload_with=engine)
+
+        return (solar, meta)
+
+    def __get_init_values(self, json_string: str):
+        values = json.loads(json_string)
+
+        source_id = values['id']
+        source_name = values['name']
+
+        return [{"id": source_id}, {"name": source_name}]
+
+    def parse_data(self, data):
+        parsed = {}
+        parsed["type"] = data["children"][0]["parameter"][2]["valueType"]
+        parsed["value"] = data["children"][0]["parameter"][2]["value"]["doubleValue"]
+        parsed["unit"] = "MWh"
+        return parsed
+
+    def collect_data(self, empty):
+        c = HTTPSConnection("rest01.alphaopen.com")
+        userAndPass = b64encode(bytes(self.rest_api_key, 'utf-8')).decode("ascii")
+        headers = {'Authorization': 'Basic %s' % userAndPass}
+
+        rospy.loginfo("Sending a request...")
+        try:
+            c.request('GET', '/api/v1/object/', headers=headers)
+            # get the response back
+            res = c.getresponse()
+
+            if res.status == 200:
+                # at this point you could check the status etc
+                # this gets the page text
+                data = res.read().decode("utf-8")
+                rospy.loginfo("Recieved the data: {}...".format(data[:30]))
+
+                from_panel = json.loads(data)
+
+                to_db = self.parse_data(from_panel)
+
+                ins = db.insert(self.solar).values(measure=json.dumps(to_db))
+                res = self.connection.execute(ins)
+        except:
+            rospy.logerr("[Collector] Got an error. Retrying...")
 
     def spin(self):
-        def collect_data():
-            c = HTTPSConnection("rest01.alphaopen.com")
-            userAndPass = b64encode(
-                bytes(self.rest_api_key, 'utf-8')).decode("ascii")
-            headers = {'Authorization': 'Basic %s' % userAndPass}
-
-            rospy.loginfo("Sending a request...")
-            try:
-                c.request('GET', '/api/v1/object/', headers=headers)
-                # get the response back
-                res = c.getresponse()
-
-                if res.status == 200:
-                    # at this point you could check the status etc
-                    # this gets the page text
-                    data = res.read().decode("utf-8")
-
-                    rospy.loginfo("Recieved the data: {}...".format(data[:30]))
-
-                    ins = db.insert(self.solar).values(measure=data)
-                    res = self.connection.execute(ins)
-            except:
-                rospy.logerr("[Collector] Got an error. Retrying...")
-            finally:
-                rospy.loginfo("[Collector] Waiting 60 sec")
-                Timer(60, collect_data).start()
-
-        # Commented for test purspose
-        collect_data()
         rospy.spin()
 
 

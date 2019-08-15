@@ -1,7 +1,8 @@
 <launch>
     <arg name="db_url_config" default="" />
-    <arg name="table_name" default="solar" />
+    <!-- <arg name="table_name" default="solar" /> -->
     <arg name="rest_api_key_config" default="" />
+    <arg name="energy_source_config" default="" />
 
     <group ns="applicant">
         <node name="applicant" pkg="collector_agent" type="applicant_node" output="screen">
@@ -13,15 +14,18 @@
             <param name="order_lifetime" value="100" />
 
             <param name="db_url" textfile="$(arg db_url_config)" />
-            <param name="table_name" value="$(arg table_name)" />
+            <!--             <param name="table_name" value="$(arg table_name)" /> -->
         </node>
     </group>
 
     <group ns="collector">
         <node name="collector" pkg="collector_agent" type="collector_node" output="screen">
             <param name="db_url" textfile="$(arg db_url_config)" />
-            <param name="table_name" value="$(arg table_name)" />
+            <!--            <param name="table_name" value="$(arg table_name)" /> -->
             <param name="rest_api_key" textfile="$(arg rest_api_key_config)" />
+            <param name="energy_source_config" textfile="$(arg energy_source_config)" />
+            <param name="timeout" value="$(eval 24*60*60)" />
+            <param name="run_service" value="false" />
         </node>
     </group>
 </launch>
