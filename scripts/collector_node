@@ -13,7 +13,7 @@ from threading import Timer
 # ROS
 import rospy
 
-from collector_service.srv import PublishDemand, PublishDemandRequest
+from collector_agent.srv import PublishDemand, PublishDemandRequest
 
 
 class CollectorNode:
