@@ -54,7 +54,7 @@ class CollectorNode:
     def spin(self):
         def collect_data():
             c = HTTPSConnection(self.server)
-            headers = {'X-API-Key': }
+            headers = {'X-API-Key': self.rest_api_key}
 
             rospy.loginfo("Sending a request...")
             today = datetime.today()
