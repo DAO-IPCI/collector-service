@@ -78,7 +78,7 @@ class CollectorNode:
                     rospy.loginfo("Last row in db: {}".format(last_row))
 
                     if not last_row:    # if db is empty insert first row
-                        ins = db.insert(self.solar).values(measure=data)
+                        ins = db.insert(self.solar).values(measure=last_measure)
                         res = self.connection.execute(ins)
                     else:
                         measure = last_row[1]
