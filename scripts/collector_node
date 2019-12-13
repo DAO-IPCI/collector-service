@@ -90,7 +90,7 @@ class CollectorNode:
                             rospy.loginfo("Making demand")
                             delta = float(last_measure) - float(measure)
                             rospy.loginfo("Delta is {}".format(delta))
-                            self.publish_service(PublishDemandRequest(delta))
+                            self.publish_service(PublishDemandRequest(str(delta)))
 
             except Exception as e:
                 rospy.logerr("[Collector] Got an error: {}. Retrying...".format(e))
