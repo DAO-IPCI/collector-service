@@ -8,12 +8,12 @@ from datetime import datetime
 import json
 
 from http.client import HTTPSConnection
-from base64 import b64encode
 from threading import Timer
 
 # ROS
 import rospy
-from std_srvs.srv import Empty
+
+from collector_service.srv import PublishDemand, PublishDemandRequest
 
 
 class CollectorNode:
@@ -23,7 +23,7 @@ class CollectorNode:
         rospy.loginfo('Launching collector node...')
 
         rospy.wait_for_service("/applicant/publish_demand")
-        self.publish_service = rospy.ServiceProxy("/applicant/publish_demand", Empty)
+        self.publish_service = rospy.ServiceProxy("/applicant/publish_demand", PublishDemand)
 
         # Init DB
         engine = db.create_engine(rospy.get_param('~db_url')[:-1])
@@ -68,7 +68,6 @@ class CollectorNode:
                     # this gets the page text
                     data = res.read().decode("utf-8")
 
-                    rospy.loginfo("Received the data: {}...".format(data[:30]))
                     data_dict = json.loads(data)
                     last_measure = str(data_dict["data"][-1]["value"])
                     rospy.loginfo("Last received measure: {}".format(last_measure))
@@ -91,7 +90,7 @@ class CollectorNode:
                             rospy.loginfo("Making demand")
                             delta = float(last_measure) - float(measure)
                             rospy.loginfo("Delta is {}".format(delta))
-                            self.publish_service()
+                            self.publish_service(PublishDemandRequest(delta))
 
             except Exception as e:
                 rospy.logerr("[Collector] Got an error: {}. Retrying...".format(e))

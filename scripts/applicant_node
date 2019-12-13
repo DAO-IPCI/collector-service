@@ -44,7 +44,7 @@ class ApplicantNode:
         return str(deadline)
 
     def make_objective(self, delta) -> Multihash:
-        topcis = {
+        topics = {
                 "/energy": [String(str(delta))]
                 }
 
