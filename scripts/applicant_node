@@ -59,7 +59,7 @@ class ApplicantNode:
         demand.objective = self.make_objective(delta)
         demand.token = Address(rospy.get_param('~token'))
         demand.lighthouse = Address(rospy.get_param('~lighthouse'))
-        demand.cost = UInt256(rospy.get_param('~cost'))
+        demand.cost = UInt256(str(rospy.get_param('~cost')))
         demand.validatorFee = UInt256("0")
         demand.validator = Address(rospy.get_param('~validator'))
         demand.deadline = UInt256()
