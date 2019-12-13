@@ -72,7 +72,7 @@ class CollectorNode:
                     last_measure = str(data_dict["data"][-1]["value"])
                     rospy.loginfo("Last received measure: {}".format(last_measure))
 
-                    sel = self.solar.select().limit(1)
+                    sel = self.solar.select().order_by(db.desc("id")).limit(1)
                     last_row = self.connection.execute(sel).fetchone()
                     rospy.loginfo("Last row in db: {}".format(last_row))
 
