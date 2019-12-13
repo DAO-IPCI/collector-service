@@ -2,25 +2,19 @@
 # -*- coding: utf-8 -*-
 
 # Standart, System and Third Party
-import sqlalchemy as db
-from ipfsapi import connect
-from tempfile import NamedTemporaryFile
-from datetime import datetime as dt
 
 # ROS
 import rospy
-from rosbag import Bag
-from std_srvs.srv import Empty, EmptyResponse
 from std_msgs.msg import String
 
 # Robonomics communication
 from robonomics_msgs.msg import Demand
 from ethereum_common.msg import Address, UInt256
 from ethereum_common.srv import Accounts, BlockNumber
-from ipfs_common.msg import Multihash, Filepath
-from ipfs_common.srv import IpfsUploadFile, IpfsUploadFileRequest, IpfsUploadFileResponse
+from ipfs_common.msg import Multihash
+from ipfs_common.ipfs_rosbag import IpfsRosBag
 
-from collector_agent.srv import GetObjective, GetObjectiveResponse
+from collector_agent.srv import PublishDemand, PublishDemandResponse
 
 
 class ApplicantNode:
@@ -34,97 +28,40 @@ class ApplicantNode:
         self.accounts = rospy.ServiceProxy('/eth/accounts', Accounts)()
         rospy.loginfo(str(self.accounts))  # AIRA ethereum addresses
 
-        self.signing_demand = rospy.Publisher(
-            '/liability/infochan/eth/signing/demand', Demand, queue_size=128)
+        self.signing_demand = rospy.Publisher('/liability/infochan/eth/signing/demand', Demand, queue_size=128)
 
-        rospy.Service('publish_demand', Empty, self.act)
-        rospy.Service('get_objective', GetObjective, self.get_objective)
-
-        # Init DB
-        engine = db.create_engine(rospy.get_param('~db_url')[:-1])
-        metadata = db.MetaData()
-        self.connection = engine.connect()
-        self.solar = db.Table(rospy.get_param('~table_name'), metadata,
-                              autoload=True, autoload_with=engine)
+        rospy.Service('publish_demand', PublishDemand, self.act)
 
         rospy.loginfo('Applicant node is ready!')
 
     def act(self, data):
-        self.make_demand()
-        return EmptyResponse()
-
-    def get_objective(self, data):
-        obj = self.make_objective()
-        return GetObjectiveResponse(objective=obj)
+        self.make_demand(data.delta)
+        return PublishDemandResponse()
 
     def make_deadline(self):
         lifetime = int(rospy.get_param('~order_lifetime'))
-        deadline = rospy.ServiceProxy(
-            '/eth/current_block', BlockNumber)().number + lifetime
+        deadline = rospy.ServiceProxy('/eth/current_block', BlockNumber)().number + lifetime
         return str(deadline)
 
-    def make_objective(self):
-        with NamedTemporaryFile(delete=False) as tmpfile:
-            recorder = Bag(tmpfile.name, 'w')
-            rospy.loginfo("Collecting data...")
+    def make_objective(self, delta) -> Multihash:
+        topcis = {
+                "/energy": [String(str(delta))]
+                }
 
-            sel = db.select([self.solar])
-            res = self.connection.execute(sel)
+        bag = IpfsRosBag(messages=topics)
+        return bag.multihash
 
-            rospy.loginfo("Got {} rows...".format(res.rowcount))
-
-            r = rospy.Rate(100)  # 100 Hz
-
-            # item[0] - id
-            # item[1] - measure
-            # item[2] - time stamp
-            item = res.fetchone()
-            time_end = item[2]
-            recorder.write('/time_start', String(data=dt.isoformat(item[2])))
-            recorder.write('/row', String(data=item[1]))
-
-            for item in res:
-                try:
-                    recorder.write('/row', String(data=item[1]))
-                    time_end = item[2]
-                except ValueError as e:
-                    print("{} {}".format(e, item[0]))
-                r.sleep()
-
-            recorder.write('/time_end', String(data=isoformat(time_end)))
-            rospy.sleep(1)
-
-            recorder.write('/finish', String(data='done'))
-            recorder.close()
-
-            rospy.wait_for_service('/ipfs/add_file')
-            add_file = rospy.ServiceProxy('/ipfs/add_file', IpfsUploadFile)
-            response = add_file(IpfsUploadFileRequest(Filepath(tmpfile.name)))
-
-            if response.success:
-                rospy.loginfo('Objective hash: {}'.format(response.ipfs_address.multihash))
-                return response.ipfs_address.multihash
-            else:
-                rospy.logerr("Error while publishing file to IPFS: {}".format(response.error_msg))
-
-    def make_demand(self):
+    def make_demand(self, delta):
         rospy.loginfo('Making demand...')
 
         demand = Demand()
-        demand.model = Multihash()
-        demand.model.multihash = rospy.get_param('~model')
-        demand.objective = Multihash()
-        demand.objective.multihash = self.make_objective()
-        demand.token = Address()
-        demand.token.address = rospy.get_param('~token')
-        demand.lighthouse = Address()
-        demand.lighthouse.address = rospy.get_param('~lighthouse')
-        demand.cost = UInt256()
-        demand.cost.uint256 = rospy.get_param('~cost')
-        demand.validatorFee = UInt256()
-        demand.validatorFee.uint256 = '0'
-        demand.validator = Address()
-        demand.validator.address = rospy.get_param('~validator')
+        demand.model = Multihash(rospy.get_param('~model'))
+        demand.objective = self.make_objective(delta)
+        demand.token = Address(rospy.get_param('~token'))
+        demand.lighthouse = Address(rospy.get_param('~lighthouse'))
+        demand.cost = UInt256(rospy.get_param('~cost'))
+        demand.validatorFee = UInt256("0")
+        demand.validator = Address(rospy.get_param('~validator'))
         demand.deadline = UInt256()
         demand.deadline.uint256 = self.make_deadline()
 

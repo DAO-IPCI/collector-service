@@ -4,6 +4,8 @@
 # Standart, System and Third party
 import sqlalchemy as db
 from sqlalchemy.sql import func
+from datetime import datetime
+import json
 
 from http.client import HTTPSConnection
 from base64 import b64encode
@@ -11,6 +13,7 @@ from threading import Timer
 
 # ROS
 import rospy
+from std_srvs.srv import Empty
 
 
 class CollectorNode:
@@ -19,16 +22,23 @@ class CollectorNode:
         rospy.init_node('collector')
         rospy.loginfo('Launching collector node...')
 
+        rospy.wait_for_service("/applicant/publish_demand")
+        self.publish_service = rospy.ServiceProxy("/applicant/publish_demand", Empty)
+
         # Init DB
         engine = db.create_engine(rospy.get_param('~db_url')[:-1])
         self.connection = engine.connect()
         self.solar = self.__init_table(engine, rospy.get_param('~table_name'))
 
         self.rest_api_key = rospy.get_param('~rest_api_key')[:-1]
+        self.request_interval = 60      # seconds between requests
+        self.server = "api.enorchile.cl"
+        self.get_request = "/v1.0/meters?sourceid=9&quantityid=129&month={}&year={}"
 
         rospy.loginfo('Collector node is ready!')
 
-    def __init_table(self, engine, table_name):
+    @staticmethod
+    def __init_table(engine, table_name):
         metadata = db.MetaData()
         if not engine.dialect.has_table(engine, table_name):
             rospy.loginfo("Initialazing DB with a table name '{}'".format(table_name))
@@ -43,14 +53,13 @@ class CollectorNode:
 
     def spin(self):
         def collect_data():
-            c = HTTPSConnection("rest01.alphaopen.com")
-            userAndPass = b64encode(
-                bytes(self.rest_api_key, 'utf-8')).decode("ascii")
-            headers = {'Authorization': 'Basic %s' % userAndPass}
+            c = HTTPSConnection(self.server)
+            headers = {'X-API-Key': }
 
             rospy.loginfo("Sending a request...")
+            today = datetime.today()
             try:
-                c.request('GET', '/api/v1/object/', headers=headers)
+                c.request('GET', self.get_request.format(today.month, today.year), headers=headers)
                 # get the response back
                 res = c.getresponse()
 
@@ -59,17 +68,38 @@ class CollectorNode:
                     # this gets the page text
                     data = res.read().decode("utf-8")
 
-                    rospy.loginfo("Recieved the data: {}...".format(data[:30]))
+                    rospy.loginfo("Received the data: {}...".format(data[:30]))
+                    data_dict = json.loads(data)
+                    last_measure = str(data_dict["data"][-1]["value"])
+                    rospy.loginfo("Last received measure: {}".format(last_measure))
 
-                    ins = db.insert(self.solar).values(measure=data)
-                    res = self.connection.execute(ins)
-            except:
-                rospy.logerr("[Collector] Got an error. Retrying...")
+                    sel = self.solar.select().limit(1)
+                    last_row = self.connection.execute(sel).fetchone()
+                    rospy.loginfo("Last row in db: {}".format(last_row))
+
+                    if not last_row:    # if db is empty insert first row
+                        ins = db.insert(self.solar).values(measure=data)
+                        res = self.connection.execute(ins)
+                    else:
+                        measure = last_row[1]
+                        rospy.loginfo("Last measure from db: {}".format(measure))
+
+                        if last_measure != measure:
+                            ins = db.insert(self.solar).values(measure=last_measure)
+                            self.connection.execute(ins)
+
+                            rospy.loginfo("Making demand")
+                            delta = float(last_measure) - float(measure)
+                            rospy.loginfo("Delta is {}".format(delta))
+                            self.publish_service()
+
+            except Exception as e:
+                rospy.logerr("[Collector] Got an error: {}. Retrying...".format(e))
             finally:
-                rospy.loginfo("[Collector] Waiting 60 sec")
-                Timer(60, collect_data).start()
+                rospy.loginfo("[Collector] Waiting {} sec".format(self.request_interval))
+                Timer(self.request_interval, collect_data).start()
 
-        # Commented for test purspose
+        # Commented for test purpose
         collect_data()
         rospy.spin()
 
