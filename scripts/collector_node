@@ -31,11 +31,13 @@ class CollectorNode:
         self.solar = self.__init_table(engine, rospy.get_param('~table_name'))
 
         self.rest_api_key = rospy.get_param('~rest_api_key')[:-1]
-        self.request_interval = 60      # seconds between requests
+        self.request_interval = 24*60*60      # seconds between requests
         self.server = "api.enorchile.cl"
         self.get_request = "/v1.0/meters?sourceid=9&quantityid=129&month={}&year={}"
 
         rospy.loginfo('Collector node is ready!')
+
+        rospy.loginfo("Interval between requests is {} hours".format(int(self.request_interval / 60 / 60)))
 
     @staticmethod
     def __init_table(engine, table_name):
@@ -56,47 +58,56 @@ class CollectorNode:
             c = HTTPSConnection(self.server)
             headers = {'X-API-Key': self.rest_api_key}
 
-            rospy.loginfo("Sending a request...")
+            # Quering the last row
+            sel = self.solar.select().order_by(db.desc("id")).limit(1)
+            last_row = self.connection.execute(sel).fetchone()
+            last_date = last_row[2]
+
             today = datetime.today()
-            try:
-                c.request('GET', self.get_request.format(today.month, today.year), headers=headers)
-                # get the response back
-                res = c.getresponse()
+            if (today - last_date).total_seconds() > self.request_interval:
+                rospy.loginfo("More than {} seconds have passed since last request".format(self.request_interval))
+                rospy.loginfo("Requesting new data...")
+                try:
+                    c.request('GET', self.get_request.format(today.month, today.year), headers=headers)
+                    # get the response back
+                    res = c.getresponse()
 
-                if res.status == 200:
-                    # at this point you could check the status etc
-                    # this gets the page text
-                    data = res.read().decode("utf-8")
+                    if res.status == 200:
+                        # at this point you could check the status etc
+                        # this gets the page text
+                        data = res.read().decode("utf-8")
 
-                    data_dict = json.loads(data)
-                    last_measure = str(data_dict["data"][-1]["value"])
-                    rospy.loginfo("Last received measure: {}".format(last_measure))
+                        data_dict = json.loads(data)
+                        res_measure = str(data_dict["data"][-1]["value"])
+                        res_timeutc = str(data_dict["data"][-1]["timeutc"])
 
-                    sel = self.solar.select().order_by(db.desc("id")).limit(1)
-                    last_row = self.connection.execute(sel).fetchone()
-                    rospy.loginfo("Last row in db: {}".format(last_row))
+                        rospy.loginfo("Received response: {} kW at {}".format(res_measure, res_timeutc))
 
-                    if not last_row:    # if db is empty insert first row
-                        ins = db.insert(self.solar).values(measure=last_measure)
-                        res = self.connection.execute(ins)
-                    else:
-                        measure = last_row[1]
-                        rospy.loginfo("Last measure from db: {}".format(measure))
+                        sel = self.solar.select().order_by(db.desc("id")).limit(1)
+                        last_row = self.connection.execute(sel).fetchone()
+                        # rospy.loginfo("Last row in db: {}".format(last_row))
 
-                        if last_measure != measure:
+                        if not last_row:    # if db is empty insert first row
                             ins = db.insert(self.solar).values(measure=last_measure)
-                            self.connection.execute(ins)
+                            res = self.connection.execute(ins)
+                        else:
+                            measure = last_row[1]
+                            # rospy.loginfo("Last measure from db: {}".format(measure))
 
-                            rospy.loginfo("Making demand")
-                            delta = float(last_measure) - float(measure)
-                            rospy.loginfo("Delta is {}".format(delta))
-                            self.publish_service(PublishDemandRequest(str(delta)))
+                            if last_measure != measure:
+                                ins = db.insert(self.solar).values(measure=last_measure)
+                                self.connection.execute(ins)
 
-            except Exception as e:
-                rospy.logerr("[Collector] Got an error: {}. Retrying...".format(e))
-            finally:
-                rospy.loginfo("[Collector] Waiting {} sec".format(self.request_interval))
-                Timer(self.request_interval, collect_data).start()
+                                delta = float(res_measure) - float(measure)
+                                rospy.loginfo("Delta is {}".format(delta))
+
+                                self.publish_service(PublishDemandRequest(str(delta)))
+
+                except Exception as e:
+                    rospy.logerr("[Collector] Got an error: {}. Retrying...".format(e))
+
+            Timer(self.request_interval, collect_data).start()
+
 
         # Commented for test purpose
         collect_data()

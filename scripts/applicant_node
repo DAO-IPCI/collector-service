@@ -44,16 +44,16 @@ class ApplicantNode:
         return str(deadline)
 
     def make_objective(self, delta) -> Multihash:
+        rospy.loginfo("Saving log to IPFS...")
         topics = {
                 "/energy": [String(str(delta))]
                 }
 
         bag = IpfsRosBag(messages=topics)
+        rospy.loginfo("Hash of the log: {}".format(bag.multihash.multihash))
         return bag.multihash
 
     def make_demand(self, delta):
-        rospy.loginfo('Making demand...')
-
         demand = Demand()
         demand.model = Multihash(rospy.get_param('~model'))
         demand.objective = self.make_objective(delta)
@@ -65,8 +65,8 @@ class ApplicantNode:
         demand.deadline = UInt256()
         demand.deadline.uint256 = self.make_deadline()
 
+        rospy.loginfo("Sending a request to issue green certificates to Robonomics Network...")
         self.signing_demand.publish(demand)
-        rospy.loginfo(demand)
 
     def spin(self):
         rospy.spin()
