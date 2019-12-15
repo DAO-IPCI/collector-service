@@ -63,12 +63,12 @@ class CollectorNode:
             last_row = self.connection.execute(sel).fetchone()
             last_date = last_row[2]
 
-            rospy.loginfo("Last measurement stored in DB is {} at {}"
+            rospy.loginfo("Last measurement stored in DB is {} kW at {}"
                           .format(last_row[1], last_date))
 
             today = datetime.now(timezone.utc)
             if (today - last_date).total_seconds() > self.request_interval:
-                rospy.loginfo("More than {} seconds have passed since last request".format(self.request_interval))
+                rospy.loginfo("More than {} hours have passed since last request".format(int(self.request_interval/60/60)))
                 rospy.loginfo("Requesting new data...")
                 try:
                     c.request('GET', self.get_request.format(today.month, today.year), headers=headers)
