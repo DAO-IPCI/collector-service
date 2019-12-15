@@ -2,8 +2,8 @@
     <arg name="db_url_config" default="" />
     <arg name="table_name" default="solar" />
     <arg name="rest_api_key_config" default="" />
-    <arg name="lighthouse" value="0xD40AC7F1e5401e03D00F5aeC1779D8e5Af4CF9f1" />
-    <arg name="token" value="0x7dE91B204C1C737bcEe6F000AAA6569Cf7061cb7" />
+    <arg name="lighthouse" default="0xD40AC7F1e5401e03D00F5aeC1779D8e5Af4CF9f1" />
+    <arg name="token" default="0x7dE91B204C1C737bcEe6F000AAA6569Cf7061cb7" />
 
     <group ns="applicant">
         <node name="applicant" pkg="collector_agent" type="applicant_node" output="screen">
