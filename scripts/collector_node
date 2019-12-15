@@ -4,7 +4,7 @@
 # Standart, System and Third party
 import sqlalchemy as db
 from sqlalchemy.sql import func
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 from http.client import HTTPSConnection
@@ -63,7 +63,7 @@ class CollectorNode:
             last_row = self.connection.execute(sel).fetchone()
             last_date = last_row[2]
 
-            today = datetime.today()
+            today = datetime.now(timezone.utc)
             if (today - last_date).total_seconds() > self.request_interval:
                 rospy.loginfo("More than {} seconds have passed since last request".format(self.request_interval))
                 rospy.loginfo("Requesting new data...")
@@ -88,14 +88,14 @@ class CollectorNode:
                         # rospy.loginfo("Last row in db: {}".format(last_row))
 
                         if not last_row:    # if db is empty insert first row
-                            ins = db.insert(self.solar).values(measure=last_measure)
+                            ins = db.insert(self.solar).values(measure=res_measure)
                             res = self.connection.execute(ins)
                         else:
                             measure = last_row[1]
                             # rospy.loginfo("Last measure from db: {}".format(measure))
 
-                            if last_measure != measure:
-                                ins = db.insert(self.solar).values(measure=last_measure)
+                            if res_measure != measure:
+                                ins = db.insert(self.solar).values(measure=res_measure)
                                 self.connection.execute(ins)
 
                                 delta = float(res_measure) - float(measure)
